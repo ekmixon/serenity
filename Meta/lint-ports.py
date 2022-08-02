@@ -40,7 +40,7 @@ def read_port_table(filename):
     with open(filename, 'r') as fp:
         matches = PORT_TABLE_REGEX.findall(fp.read())
         for match in matches:
-            line_len = sum([len(part) for part in match])
+            line_len = sum(len(part) for part in match)
             ports[match[0]] = {
                 "dir_ref": match[1],
                 "name": match[2].strip(),
@@ -67,7 +67,7 @@ def read_port_dirs():
             print(f"Ports/{entry} is neither a port (not a directory) nor an ignored file?!")
             all_good = False
             continue
-        if not os.path.exists(entry + '/package.sh'):
+        if not os.path.exists(f'{entry}/package.sh'):
             print(f"Ports/{entry}/ is missing its package.sh?!")
             all_good = False
             continue
@@ -118,7 +118,7 @@ def check_package_files(ports):
 
         props = get_port_properties(port)
 
-        if not props['auth_type'] in ('sha256', 'sig', ''):
+        if props['auth_type'] not in ('sha256', 'sig', ''):
             print(f"Ports/{port} uses invalid signature algorithm '{props['auth_type']}' for 'auth_type'")
             all_good = False
 
@@ -168,7 +168,7 @@ def check_available_ports(from_table, ports):
         actual_version = from_table[port]["version"]
         expected_version = ports[port]["version"]
         if GIT_HASH_REGEX.match(expected_version):
-            expected_version = expected_version[0:7]
+            expected_version = expected_version[:7]
         if expected_version == "git":
             expected_version = ""
         if actual_version != expected_version:

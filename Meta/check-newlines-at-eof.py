@@ -64,5 +64,5 @@ def run():
 
 
 if __name__ == '__main__':
-    os.chdir(os.path.dirname(__file__) + "/..")
+    os.chdir(f"{os.path.dirname(__file__)}/..")
     run()

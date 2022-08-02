@@ -25,9 +25,7 @@ def parse(sexp):
                 stack[-2].append(stack.pop())
             elif c == '"':
                 stack.append('')
-            elif c in whitespace:
-                pass
-            else:
+            elif c not in whitespace:
                 stack.append((c,))
         elif kind == str:
             if c == '"':
@@ -67,16 +65,16 @@ def generate_module_source_for_compilation(entries):
     s = '('
     for entry in entries:
         if type(entry) == tuple and len(entry) == 1 and type(entry[0]) == str:
-            s += entry[0] + ' '
+            s += f'{entry[0]} '
         elif type(entry) == str:
             s += json.dumps(entry).replace('\\\\', '\\') + ' '
         elif type(entry) == list:
             s += generate_module_source_for_compilation(entry)
         else:
-            raise Exception("wat? I dunno how to pretty print " + str(type(entry)))
+            raise Exception(f"wat? I dunno how to pretty print {str(type(entry))}")
     while s.endswith(' '):
-        s = s[:len(s) - 1]
-    return s + ')'
+        s = s[:-1]
+    return f'{s})'
 
 
 def generate_binary_source(chunks):
@@ -162,7 +160,7 @@ def generate(ast):
                     "module": result['module'],
                 }]
             })
-        elif len(entry) in [2, 3] and entry[0][0].startswith('assert_'):
+        elif len(entry) in {2, 3} and entry[0][0].startswith('assert_'):
             if entry[1][0] == ('invoke',):
                 arg, name, module = 0, None, None
                 if isinstance(entry[1][1], str):
@@ -171,15 +169,23 @@ def generate(ast):
                     name = entry[1][2]
                     module = named_modules[entry[1][1][0]]
                     arg = 1
-                tests[-1]["tests"].append({
-                    "kind": entry[0][0][len('assert_'):],
-                    "function": {
-                        "module": module,
-                        "name": name,
-                        "args": list(parse_typed_value(x) for x in entry[1][arg + 2:])
-                    },
-                    "result": parse_typed_value(entry[2]) if len(entry) == 3 + arg else None
-                })
+                tests[-1]["tests"].append(
+                    {
+                        "kind": entry[0][0][len('assert_') :],
+                        "function": {
+                            "module": module,
+                            "name": name,
+                            "args": [
+                                parse_typed_value(x)
+                                for x in entry[1][arg + 2 :]
+                            ],
+                        },
+                        "result": parse_typed_value(entry[2])
+                        if len(entry) == 3 + arg
+                        else None,
+                    }
+                )
+
             elif entry[1][0] == ('get',):
                 arg, name, module = 0, None, None
                 if isinstance(entry[1][1], str):
@@ -222,15 +228,22 @@ def generate(ast):
                 name = entry[1][2]
                 module = named_modules[entry[1][1][0]]
                 arg = 1
-            tests[-1]["tests"].append({
-                "kind": "ignore",
-                "function": {
-                    "module": module,
-                    "name": name,
-                    "args": list(parse_typed_value(x) for x in entry[1][arg + 2:])
-                },
-                "result": parse_typed_value(entry[2]) if len(entry) == 3 + arg else None
-            })
+            tests[-1]["tests"].append(
+                {
+                    "kind": "ignore",
+                    "function": {
+                        "module": module,
+                        "name": name,
+                        "args": [
+                            parse_typed_value(x) for x in entry[1][arg + 2 :]
+                        ],
+                    },
+                    "result": parse_typed_value(entry[2])
+                    if len(entry) == 3 + arg
+                    else None,
+                }
+            )
+
         elif len(entry) > 1 and entry[0][0] == 'register':
             if len(entry) == 3:
                 registered_modules[entry[1]] = named_modules[entry[2][0]]
@@ -239,7 +252,7 @@ def generate(ast):
             else:
                 index = len(tests) - 1
                 registered_modules[entry[1]] = index
-                named_modules_inverse[index] = (":" + entry[1], entry[1])
+                named_modules_inverse[index] = f":{entry[1]}", entry[1]
         else:
             if not len(tests):
                 tests.append({
@@ -272,11 +285,7 @@ def genarg(spec):
 
                 # cast back to i64 to get the correct sign
                 return str(struct.unpack('>q', struct.pack('>Q', int(x, 16)))[0]) + 'n'
-            if spec['type'] == 'i64':
-                # Make a bigint instead, since `double' cannot fit all i64 values.
-                return x + 'n'
-            return x
-
+            return f'{x}n' if spec['type'] == 'i64' else x
         if x == 'nan':
             return 'NaN'
         if x == '-nan':
@@ -310,9 +319,7 @@ def genarg(spec):
     if isinstance(x, str):
         if x.startswith('nan'):
             return 'NaN'
-        if x.startswith('-nan'):
-            return '-NaN'
-        return x
+        return '-NaN' if x.startswith('-nan') else x
     return str(x)
 
 
@@ -389,17 +396,15 @@ def gentest(entry, main_name):
         key = "function" if "function" in entry else "get"
         if entry[key]['module'] is not None:
             tmodule = f'namedModules[{json.dumps(named_modules_inverse[entry[key]["module"]][0])}]'
-    source = (
-            f'test({json.dumps(test_name)}, () => {{\n' +
-            (
-                f'let {ident} = {tmodule}.getExport({json.dumps(name)});\n        '
-                f'expect({ident}).not.toBeUndefined();\n        '
-                if not isempty else ''
-            ) +
-            f'{genresult(ident, entry, count)}'
-            '});\n\n    '
-    )
-    return source
+    return (
+        f'test({json.dumps(test_name)}, () => {{\n'
+        + (
+            ''
+            if isempty
+            else f'let {ident} = {tmodule}.getExport({json.dumps(name)});\n        '
+            f'expect({ident}).not.toBeUndefined();\n        '
+        )
+    ) + f'{genresult(ident, entry, count)}' '});\n\n    '
 
 
 def gen_parse_module(name, index):
@@ -418,9 +423,7 @@ def gen_parse_module(name, index):
 
 
 def nth(a, x, y=None):
-    if y:
-        return a[x:y]
-    return a[x]
+    return a[x:y] if y else a[x]
 
 
 def compile_wasm_source(mod, outpath):

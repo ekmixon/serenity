@@ -52,9 +52,11 @@ def run():
     for filename in files:
         with open(filename, "r") as f:
             file_content = f.read()
-        if not any(filename.startswith(forbidden_prefix) for forbidden_prefix in LICENSE_HEADER_CHECK_EXCLUDES):
-            if not GOOD_LICENSE_HEADER_PATTERN.search(file_content):
-                errors_license.append(filename)
+        if not any(
+            filename.startswith(forbidden_prefix)
+            for forbidden_prefix in LICENSE_HEADER_CHECK_EXCLUDES
+        ) and not GOOD_LICENSE_HEADER_PATTERN.search(file_content):
+            errors_license.append(filename)
         if LIBM_MATH_H_INCLUDE_STRING in file_content:
             errors_libm_math_h.append(filename)
         if filename.endswith('.h'):
@@ -82,5 +84,5 @@ def run():
 
 
 if __name__ == '__main__':
-    os.chdir(os.path.dirname(__file__) + "/..")
+    os.chdir(f"{os.path.dirname(__file__)}/..")
     run()
